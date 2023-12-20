@@ -75,7 +75,7 @@ diff -r -u ./linux-6.5.2/kernel/fork.c ./linux-6.5.2-custom/kernel/fork.c
  bad_fork_cancel_cgroup:
 diff -r -u ./linux-6.5.2/kernel/sched/core.c ./linux-6.5.2-custom/kernel/sched/core.c
 --- ./linux-6.5.2/kernel/sched/core.c	2023-09-06 23:22:26.000000000 +0300
-+++ ./linux-6.5.2-custom/kernel/sched/core.c	2023-12-20 06:08:00.996211367 +0300
++++ ./linux-6.5.2-custom/kernel/sched/core.c	2023-12-20 06:28:30.686163169 +0300
 @@ -3749,6 +3749,7 @@
  static inline void ttwu_do_wakeup(struct task_struct *p)
  {
@@ -88,7 +88,7 @@ diff -r -u ./linux-6.5.2/kernel/sched/core.c ./linux-6.5.2-custom/kernel/sched/c
  
  	raw_spin_lock_irqsave(&p->pi_lock, rf.flags);
  	WRITE_ONCE(p->__state, TASK_RUNNING);
-+	WRITE_ONCE(p->scheduled_to_exec_counter, READ_ONCE(scheduled_to_exec_counter) + 1);
++	WRITE_ONCE(p->scheduled_to_exec_counter, READ_ONCE(p->scheduled_to_exec_counter) + 1);
  #ifdef CONFIG_SMP
  	/*
  	 * Fork balancing, do it here and not earlier because:
@@ -119,7 +119,6 @@ diff -r -u ./linux-6.5.2/kernel/sched/core.c ./linux-6.5.2-custom/kernel/sched/c
  	idle->__state = TASK_RUNNING;
  	idle->se.exec_start = sched_clock();
  	/*
-
 Только в ./linux-6.5.2-custom/: Module.symvers
 Только в ./linux-6.5.2-custom/scripts: asn1_compiler
 Только в ./linux-6.5.2-custom/scripts/basic: fixdep
