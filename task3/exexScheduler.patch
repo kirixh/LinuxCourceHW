@@ -1,0 +1,142 @@
+Только в ./linux-6.5.2-custom/arch/x86/boot/compressed: drivers
+Только в ./linux-6.5.2-custom/arch/x86/include: generated
+Только в ./linux-6.5.2-custom/: .config
+Только в ./linux-6.5.2-custom/: .config.old
+diff -r -u ./linux-6.5.2/fs/proc/base.c ./linux-6.5.2-custom/fs/proc/base.c
+--- ./linux-6.5.2/fs/proc/base.c	2023-09-06 23:22:26.000000000 +0300
++++ ./linux-6.5.2-custom/fs/proc/base.c	2023-12-20 05:48:00.781250718 +0300
+@@ -3231,6 +3231,14 @@
+ }
+ #endif /* CONFIG_STACKLEAK_METRICS */
+ 
++static int proc_scheduled_to_exec_counter(struct seq_file *m, struct pid_namespace *ns,
++    struct pid *pid, struct task_struct *task)
++{
++	(m, "Proc was scheduled to execute %lu times.\n", task->scheduled_to_exec_counter);
++	return 0;
++}
++
++
+ /*
+  * Thread groups
+  */
+@@ -3351,6 +3359,7 @@
+ 	ONE("ksm_merging_pages",  S_IRUSR, proc_pid_ksm_merging_pages),
+ 	ONE("ksm_stat",  S_IRUSR, proc_pid_ksm_stat),
+ #endif
++	ONE("scheduled_to_exec_counter", S_IRUGO, proc_scheduled_to_exec_counter),
+ };
+ 
+ static int proc_tgid_base_readdir(struct file *file, struct dir_context *ctx)
+@@ -3689,6 +3698,7 @@
+ 	ONE("ksm_merging_pages",  S_IRUSR, proc_pid_ksm_merging_pages),
+ 	ONE("ksm_stat",  S_IRUSR, proc_pid_ksm_stat),
+ #endif
++	ONE("scheduled_to_exec_counter", S_IRUGO, proc_scheduled_to_exec_counter),
+ };
+ 
+ static int proc_tid_base_readdir(struct file *file, struct dir_context *ctx)
+Только в ./linux-6.5.2-custom/include: config
+Только в ./linux-6.5.2-custom/include: generated
+diff -r -u ./linux-6.5.2/include/linux/sched.h ./linux-6.5.2-custom/include/linux/sched.h
+--- ./linux-6.5.2/include/linux/sched.h	2023-09-06 23:22:26.000000000 +0300
++++ ./linux-6.5.2-custom/include/linux/sched.h	2023-12-20 05:52:24.245578596 +0300
+@@ -1530,7 +1530,7 @@
+ #ifdef CONFIG_USER_EVENTS
+ 	struct user_event_mm		*user_event_mm;
+ #endif
+-
++	unsigned long scheduled_to_exec_counter;
+ 	/*
+ 	 * New fields for task_struct should be added above here, so that
+ 	 * they are included in the randomized portion of task_struct.
+diff -r -u ./linux-6.5.2/init/init_task.c ./linux-6.5.2-custom/init/init_task.c
+--- ./linux-6.5.2/init/init_task.c	2023-09-06 23:22:26.000000000 +0300
++++ ./linux-6.5.2-custom/init/init_task.c	2023-12-20 05:53:54.356310428 +0300
+@@ -210,6 +210,7 @@
+ #ifdef CONFIG_SECCOMP_FILTER
+ 	.seccomp	= { .filter_count = ATOMIC_INIT(0) },
+ #endif
++	.scheduled_to_exec_counter = 0,
+ };
+ EXPORT_SYMBOL(init_task);
+ 
+diff -r -u ./linux-6.5.2/kernel/fork.c ./linux-6.5.2-custom/kernel/fork.c
+--- ./linux-6.5.2/kernel/fork.c	2023-09-06 23:22:26.000000000 +0300
++++ ./linux-6.5.2-custom/kernel/fork.c	2023-12-20 05:57:13.881487026 +0300
+@@ -2735,6 +2735,8 @@
+ 
+ 	copy_oom_score_adj(clone_flags, p);
+ 
++	p->scheduled_to_exec_counter = 0;
++
+ 	return p;
+ 
+ bad_fork_cancel_cgroup:
+diff -r -u ./linux-6.5.2/kernel/sched/core.c ./linux-6.5.2-custom/kernel/sched/core.c
+--- ./linux-6.5.2/kernel/sched/core.c	2023-09-06 23:22:26.000000000 +0300
++++ ./linux-6.5.2-custom/kernel/sched/core.c	2023-12-20 06:08:00.996211367 +0300
+@@ -3749,6 +3749,7 @@
+ static inline void ttwu_do_wakeup(struct task_struct *p)
+ {
+ 	WRITE_ONCE(p->__state, TASK_RUNNING);
++	WRITE_ONCE(p->scheduled_to_exec_counter, READ_ONCE(p->scheduled_to_exec_counter) + 1);
+ 	trace_sched_wakeup(p);
+ }
+ 
+@@ -4851,6 +4852,7 @@
+ 
+ 	raw_spin_lock_irqsave(&p->pi_lock, rf.flags);
+ 	WRITE_ONCE(p->__state, TASK_RUNNING);
++	WRITE_ONCE(p->scheduled_to_exec_counter, READ_ONCE(scheduled_to_exec_counter) + 1);
+ #ifdef CONFIG_SMP
+ 	/*
+ 	 * Fork balancing, do it here and not earlier because:
+@@ -6641,6 +6643,8 @@
+ 	if (!(sched_mode & SM_MASK_PREEMPT) && prev_state) {
+ 		if (signal_pending_state(prev_state, prev)) {
+ 			WRITE_ONCE(prev->__state, TASK_RUNNING);
++			WRITE_ONCE(prev->scheduled_to_exec_counter,
++			 READ_ONCE(prev->scheduled_to_exec_counter) + 1);
+ 		} else {
+ 			prev->sched_contributes_to_load =
+ 				(prev_state & TASK_UNINTERRUPTIBLE) &&
+@@ -8910,6 +8914,8 @@
+  */
+ void __sched yield(void)
+ {
++	WRITE_ONCE(current->scheduled_to_exec_counter,
++	READ_ONCE(current->scheduled_to_exec_counter) + 1);
+ 	set_current_state(TASK_RUNNING);
+ 	do_sched_yield();
+ }
+@@ -9265,6 +9271,8 @@
+ 	raw_spin_lock_irqsave(&idle->pi_lock, flags);
+ 	raw_spin_rq_lock(rq);
+ 
++	WRITE_ONCE(idle->scheduled_to_exec_counter,
++	READ_ONCE(idle->scheduled_to_exec_counter) + 1);
+ 	idle->__state = TASK_RUNNING;
+ 	idle->se.exec_start = sched_clock();
+ 	/*
+Только в ./linux-6.5.2-custom/: keyboardPressCounter
+Только в ./linux-6.5.2-custom/: Module.symvers
+Только в ./linux-6.5.2-custom/: phonebook
+Только в ./linux-6.5.2-custom/scripts: asn1_compiler
+Только в ./linux-6.5.2-custom/scripts/basic: fixdep
+Только в ./linux-6.5.2-custom/scripts: kallsyms
+Только в ./linux-6.5.2-custom/scripts/kconfig: conf
+Только в ./linux-6.5.2-custom/scripts/mod: devicetable-offsets.h
+Только в ./linux-6.5.2-custom/scripts/mod: elfconfig.h
+Только в ./linux-6.5.2-custom/scripts/mod: mk_elfconfig
+Только в ./linux-6.5.2-custom/scripts/mod: modpost
+Только в ./linux-6.5.2-custom/scripts: module.lds
+Только в ./linux-6.5.2-custom/scripts/selinux/genheaders: genheaders
+Только в ./linux-6.5.2-custom/scripts/selinux/mdp: mdp
+Только в ./linux-6.5.2-custom/scripts: sorttable
+Только в ./linux-6.5.2-custom/security/selinux: av_permissions.h
+Только в ./linux-6.5.2-custom/tools/objtool/arch/x86: lib
+Только в ./linux-6.5.2-custom/tools/objtool: fixdep
+Только в ./linux-6.5.2-custom/tools/objtool: libsubcmd
+Только в ./linux-6.5.2-custom/tools/objtool: objtool
+Только в ./linux-6.5.2-custom/: .version
