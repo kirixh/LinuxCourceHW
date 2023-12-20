@@ -2,7 +2,7 @@
 #include <linux/module.h>
 #include <linux/device.h>
 #include <linux/cdev.h>
-#include <linux/slab.h>
+#include <linux/types.h>
 #include <linux/idr.h>
 #include <linux/uaccess.h>
 #include <linux/fs.h>
@@ -210,7 +210,11 @@ static ssize_t phoneBookDevice_write(struct file *file, const char __user *buf, 
     if (BUFFER_SIZE - *offset < length) {
         length = BUFFER_SIZE - *offset;
     }
-    copy_from_user(kernelBuffer + *offset, buf, length);
+    int err = copy_from_user(kernelBuffer + *offset, buf, length);
+    if (err) {
+        pr_alert("Phonebook device write copy_from_user failed with %d\n", err);
+        return err;
+    }
     *offset += length;
     kernelBuffer[*offset] = '\0';
     parseCommand();
@@ -228,7 +232,11 @@ static ssize_t phoneBookDevice_read(struct file *file, char __user *buf, size_t 
     if (data_len - *offset < length) {
         length = data_len - *offset;
     }
-    copy_to_user(buf, kernelBuffer + *offset, length);
+    int err = copy_to_user(buf, kernelBuffer + *offset, length);
+    if (err) {
+        pr_alert("Phonebook device read copy_to_user failed with %d\n", err);
+        return err;
+    }
     *offset += length;
     return length;
 }
@@ -244,7 +252,7 @@ static int __init phonebook_module_added(void) {
         return err;
     }
 
-    device.cls = class_create(THIS_MODULE, DEVICE_NAME);
+    device.cls = class_create(DEVICE_NAME);
     if (device.cls == NULL) {
         pr_alert("Class_create failed!\n");
         unregister_chrdev_region(device.major, 1);

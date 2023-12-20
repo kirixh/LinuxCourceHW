@@ -1,0 +1,72 @@
+Только в ./linux-6.5.2-custom/arch/x86/boot/compressed: drivers
+diff -r -u ./linux-6.5.2/arch/x86/entry/syscalls/syscall_64.tbl ./linux-6.5.2-custom/arch/x86/entry/syscalls/syscall_64.tbl
+--- ./linux-6.5.2/arch/x86/entry/syscalls/syscall_64.tbl	2023-09-06 23:22:26.000000000 +0300
++++ ./linux-6.5.2-custom/arch/x86/entry/syscalls/syscall_64.tbl	2023-12-20 03:25:20.876862496 +0300
+@@ -373,6 +373,9 @@
+ 449	common	futex_waitv		sys_futex_waitv
+ 450	common	set_mempolicy_home_node	sys_set_mempolicy_home_node
+ 451	common	cachestat		sys_cachestat
++452	common	add_user		sys_add_user
++453	common	del_user		sys_del_user
++454	common	get_user		sys_get_user
+ 
+ #
+ # Due to a historical design error, certain syscalls are numbered differently
+Только в ./linux-6.5.2-custom/arch/x86/include: generated
+Только в ./linux-6.5.2-custom/: .config
+Только в ./linux-6.5.2-custom/: .config.old
+Только в ./linux-6.5.2-custom/include: config
+Только в ./linux-6.5.2-custom/include: generated
+diff -r -u ./linux-6.5.2/include/linux/syscalls.h ./linux-6.5.2-custom/include/linux/syscalls.h
+--- ./linux-6.5.2/include/linux/syscalls.h	2023-09-06 23:22:26.000000000 +0300
++++ ./linux-6.5.2-custom/include/linux/syscalls.h	2023-12-20 03:32:34.053030402 +0300
+@@ -74,6 +74,8 @@
+ enum landlock_rule_type;
+ struct cachestat_range;
+ struct cachestat;
++struct user_data;
++struct found_users_data;
+ 
+ #include <linux/types.h>
+ #include <linux/aio_abi.h>
+@@ -1283,4 +1285,8 @@
+ 		int __user *optlen);
+ int __sys_setsockopt(int fd, int level, int optname, char __user *optval,
+ 		int optlen);
++asmlinkage long sys_add_user(struct user_data *input_data);
++asmlinkage long sys_del_user(const char* surname, unsigned int len);
++asmlinkage long sys_get_user(const char* surname, unsigned int len, struct user_data *output_data);
++
+ #endif
+diff -r -u ./linux-6.5.2/Makefile ./linux-6.5.2-custom/Makefile
+--- ./linux-6.5.2/Makefile	2023-09-06 23:22:26.000000000 +0300
++++ ./linux-6.5.2-custom/Makefile	2023-12-20 03:33:38.559986383 +0300
+@@ -751,7 +751,7 @@
+ 
+ ifeq ($(KBUILD_EXTMOD),)
+ # Objects we will link into vmlinux / subdirs we need to visit
+-core-y		:=
++core-y		:= phonebook/
+ drivers-y	:=
+ libs-y		:= lib/
+ endif # KBUILD_EXTMOD
+Только в ./linux-6.5.2-custom/: Module.symvers
+Только в ./linux-6.5.2-custom/: phonebook
+Только в ./linux-6.5.2-custom/scripts: asn1_compiler
+Только в ./linux-6.5.2-custom/scripts/basic: fixdep
+Только в ./linux-6.5.2-custom/scripts: kallsyms
+Только в ./linux-6.5.2-custom/scripts/kconfig: conf
+Только в ./linux-6.5.2-custom/scripts/mod: devicetable-offsets.h
+Только в ./linux-6.5.2-custom/scripts/mod: elfconfig.h
+Только в ./linux-6.5.2-custom/scripts/mod: mk_elfconfig
+Только в ./linux-6.5.2-custom/scripts/mod: modpost
+Только в ./linux-6.5.2-custom/scripts: module.lds
+Только в ./linux-6.5.2-custom/scripts/selinux/genheaders: genheaders
+Только в ./linux-6.5.2-custom/scripts/selinux/mdp: mdp
+Только в ./linux-6.5.2-custom/scripts: sorttable
+Только в ./linux-6.5.2-custom/security/selinux: av_permissions.h
+Только в ./linux-6.5.2-custom/tools/objtool/arch/x86: lib
+Только в ./linux-6.5.2-custom/tools/objtool: fixdep
+Только в ./linux-6.5.2-custom/tools/objtool: libsubcmd
+Только в ./linux-6.5.2-custom/tools/objtool: objtool
+Только в ./linux-6.5.2-custom/: .version
