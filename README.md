@@ -1,5 +1,3 @@
-# LinuxKernelModules
-
 ## Разработка модулей для ядра linux в рамках учебного задания
 
 ### **Phonebook**
